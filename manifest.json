@@ -1,0 +1,14 @@
+{
+  "name": "GoodbyeBot!",
+  "description": "My first packaged app. An IRC bot that brings positive collaboration to channels",
+  "version": "0.1",
+  "app": {
+    "background": {
+      "scripts": ["background.js"]
+    }
+  },
+  "permissions": [
+    {"socket": ["tcp-connect"]},
+    "storage"
+  ]
+}
