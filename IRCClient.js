@@ -7,23 +7,24 @@ function IRCClient(){
   this.userName;
   this.connected=false;
   this.channelName="";
-  this.silentTimeMin = .1;
   this.goodVibes = [];
+  //silentTimeMin is a default function to prevent your bot from spamming. 
+  //if the bot has privmsg within the last .1 minutes, current write is discarded.
+  this.silentTimeMin = .1;
+  //timeofLastChanMsg is used to keep track of when the bot last sent privmsg. 
+  //initialize to 1 so we can check it against silentTimeMin later.
   this.timeOfLastChanMsg = new Date();
-  this.timeOfLastChanMsg.setTime(1); //initialize the time to 1.
-  //need join channel (channel)
-  //need connect (server, username,pw)
-  //need onmessage
+  this.timeOfLastChanMsg.setTime(1); 
 };
 IRCClient.prototype.connectToServer=function(Port,server)
 {
-	serverConnect=server;
-	ircPort=Port;
-	var self = this;
-	chrome.socket.create('tcp', {}, function onSocketCreate(createInfo)
-    {
-      socketId = createInfo.socketId;
-      chrome.socket.connect(socketId, serverConnect, ircPort, self.onConnected.bind(self));
+  serverConnect=server;
+  ircPort=Port;
+  var self = this;
+  chrome.socket.create('tcp', {}, function onSocketCreate(createInfo)
+  {
+    socketId = createInfo.socketId;
+    chrome.socket.connect(socketId, serverConnect, ircPort, self.onConnected.bind(self));
     }); // end socket.create
 };
 //initiates an object for command parser
@@ -50,10 +51,10 @@ IRCClient.prototype.onConnected= function()
   console.log("The socketId is "+socketId);
   //should this go in another function?
   if(this.connected){
-  this.write('PASS none');
-  this.write('NICK ' + userName);
-  this.write('USER USER 0 * :Real Name', function(){
-  	console.log("wrote pass, nick, and user user 0 *")
+    this.write('PASS none');
+    this.write('NICK ' + userName);
+    this.write('USER USER 0 * :Real Name', function(){
+     console.log("wrote pass, nick, and user user 0 *")
   })//end write
   }//end if connected
 } // end onConnected
@@ -61,10 +62,10 @@ IRCClient.prototype.onDisconnected=function()
 {
   this.connected=false;
   document.getElementById('connectionStatus').textContent = "disconnected :(";
-  chrome.socket.disconnect(socketId);
+    chrome.socket.disconnect(socketId);
 } // end onDisconnected
 IRCClient.prototype.crackMessage=function(serverLine) {
-  
+
   if(serverLine.length == 0)
   {
     return undefined;
@@ -102,11 +103,11 @@ IRCClient.prototype.str2ab = function (str)
 }
 IRCClient.prototype.processReadInfo= function(readInfo)
 {
-	var self = this;
-	var dateRead = new Date();
-    var serverMsg = self.ab2str(readInfo.data);
-    console.log(dateRead + serverMsg);
-    
+  var self = this;
+  var dateRead = new Date();
+  var serverMsg = self.ab2str(readInfo.data);
+  console.log(dateRead + serverMsg);
+  
     //if trigger matches data, do stuff here.
 
     var serverLines = [];
@@ -143,21 +144,21 @@ IRCClient.prototype.processReadInfo= function(readInfo)
       switch(m.command) {
         //Welcome message!
         case "001":
-          console.log("Ready to join channel");
+        console.log("Ready to join channel");
           //make a join function
           if(this.joinWhenConnected)
-          	this.joinWhenConnected();
+            this.joinWhenConnected();
           break;
         case "PING":
           //write a pong function
           if(this.pingResp)
-          	this.pingResp();
+            this.pingResp();
           break;
-        case "PRIVMSG":
+         case "PRIVMSG":
           this.handlePrivmsg(m); 
           console.log(m.msgSender);
           break;
-        default:
+         default:
           //All this spew is a bit annoying.
           //console.log("WARN: Unhandled message: ", m);
           break;
@@ -168,33 +169,29 @@ IRCClient.prototype.processReadInfo= function(readInfo)
 IRCClient.prototype.handlePrivmsg = function(message) {
   //This is a message to the channel:
 
-    for(var i = 0; i < message.args.length; ++i)
-    {
-      var arg = message.args[i];
+  for(var i = 0; i < message.args.length; ++i){
+    var arg = message.args[i];
       //Slice off the colon from the first arg.
       //FIXME: We should do this fixup elsewhere.
-      if(i === 0)
-      {
+    if(i === 0){
         arg = arg.substring(1);
       }
-      //find out who sent it:
-        var msgPrefix = message.prefix;
-        //console.log(message.prefix+"Prefix <---");        console.log(message.command);        console.log(message.args);
-        var msgSenderEnd=msgPrefix.search('!'); //IRC protocol is ":username!user@server CMD username msg". Hence, search for !~
-      //  console.log("msgSenderEnd: "+msgSenderEnd);
-        var msgSender = msgPrefix.substring(1,msgSenderEnd);
-      //  console.log(msgSender);
-        message.msgSender=msgSender;
-      //commence further parsing. hande over to user.
-      if (this.onMessage)
-        {
-        	this.onMessage(message, arg);
-        }
-  	}//end for	
- 
+    //find out who sent it:
+    var msgPrefix = message.prefix;
+    //console.log(message.prefix+"Prefix <---");        console.log(message.command);        console.log(message.args);
+    var msgSenderEnd=msgPrefix.search('!'); //IRC protocol is ":username!user@server CMD username msg". Hence, search for !~
+    //  console.log("msgSenderEnd: "+msgSenderEnd);
+    var msgSender = msgPrefix.substring(1,msgSenderEnd);
+    //  console.log(msgSender);
+    message.msgSender=msgSender;
+    //commence further parsing. hande over to user.
+    if (this.onMessage){
+     this.onMessage(message, arg);
+    }
+  }//end for  
 }//end handlePrivMsg()
 IRCClient.prototype.readForever=function (readInfo){
-	var self = this;
+  var self = this;
   if(readInfo!==undefined && readInfo.resultCode <= 0){
     // we've been disconnected, dang.
     self.onDisconnected();
@@ -202,8 +199,8 @@ IRCClient.prototype.readForever=function (readInfo){
     return;
   }
   if (readInfo !== undefined) {
-  	//call new function to process message
-  	this.processReadInfo(readInfo);
+    //call new function to process message
+    this.processReadInfo(readInfo);
   }
   //call read forever again so the server alerts us when something interesting happens
   chrome.socket.read(socketId, null, this.readForever.bind(this)); 
@@ -217,7 +214,7 @@ IRCClient.prototype.write= function(s, f) {
   //Make sure we're not spamming the channel. If this is going to the channel, check to see how often we're sending. 
 
   if (s.search("PRIVMSG "+this.channelName)>-1)
-   {
+  {
     //Spam Protection. We don't want to spam the channel. 
     var dateObj = new Date();
     if (dateObj.getTime()-this.timeOfLastChanMsg.getTime()>this.silentTimeMin*60000)
@@ -249,22 +246,22 @@ IRCClient.prototype.write= function(s, f) {
 // default set to .1 minutes
 IRCClient.prototype.setSilentTimeMin = function(min)
 {
-	this.silentTimeMin = min;
+  this.silentTimeMin = min;
 }
 //PONG a server
 IRCClient.prototype.pong=function(){
-	this.write("PONG :"+this.serverName);
-    displayLineToScreen('[SERVER PONG]');
+  this.write("PONG :"+this.serverName);
+  displayLineToScreen('[SERVER PONG]');
 }
 
 //join a channel if you have a valid connection
 IRCClient.prototype.join = function(channel){
-	if(this.connected){
-		this.write('JOIN ' + channel);
-		this.channelName=channel;
-	}
-	else
-		console.log("Not connected");
+  if(this.connected){
+    this.write('JOIN ' + channel);
+    this.channelName=channel;
+  }
+  else
+    console.log("Not connected");
 }
 //Rough UI to see and write channel chats
 function displayLineToScreen(text){
@@ -278,9 +275,9 @@ function displayLineToScreen(text){
   }
 }
 IRCClient.prototype.getRandomGoodVibe =function(user){
-	var goodVibes = this.goodVibes;
-	if(goodVibes.length>0)
-	{
+  var goodVibes = this.goodVibes;
+  if(goodVibes.length>0)
+  {
 
         //grab a random thing to say
         var max = (goodVibes.length>0) ? (goodVibes.length-1) : (0); //prevent goodVibes.length from being -1
@@ -288,7 +285,7 @@ IRCClient.prototype.getRandomGoodVibe =function(user){
         var indexGoodVibe=Math.floor(Math.random()*(max-min+1)-min);
         //prepare the statement for sending
         var strMsg = goodVibes[indexGoodVibe]
-       	//TODO Turn this into a Sanitize function. 
+        //TODO Turn this into a Sanitize function. 
         //Clean up message
         //replace $user with user var
         if (strMsg.search("\\$user")!==-1)
@@ -297,8 +294,8 @@ IRCClient.prototype.getRandomGoodVibe =function(user){
         }
         if(strMsg.search("\\$channel")!==-1)
         {
-        	strMsg=strMsg.replace("\$channel",this.channelName,"gi");
+          strMsg=strMsg.replace("\$channel",this.channelName,"gi");
         }
         return strMsg;
-     }
+      }
 }//end getRandomGoodVibe
