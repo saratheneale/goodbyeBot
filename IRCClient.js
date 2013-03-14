@@ -7,7 +7,7 @@ function IRCClient(){
   this.userName;
   this.connected=false;
   this.channelName="";
-  this.goodVibes = [];
+  this.goodVibes = [];//may move this 
   //silentTimeMin is a default function to prevent your bot from spamming. 
   //if the bot has privmsg within the last .1 minutes, current write is discarded.
   this.silentTimeMin = .1;
@@ -16,15 +16,18 @@ function IRCClient(){
   this.timeOfLastChanMsg = new Date();
   this.timeOfLastChanMsg.setTime(1); 
 };
-IRCClient.prototype.connectToServer=function(Port,server)
+IRCClient.prototype.connectToServer= function(Port,server)
 {
-  serverConnect=server;
-  ircPort=Port;
   var self = this;
+  self.serverConnect=server;
+  self.ircPort=Port;
+  
   chrome.socket.create('tcp', {}, function onSocketCreate(createInfo)
   {
+    //shit goes cray if i make socketId a local var. why?
     socketId = createInfo.socketId;
-    chrome.socket.connect(socketId, serverConnect, ircPort, self.onConnected.bind(self));
+    self.socketId=socketId;
+    chrome.socket.connect(socketId, self.serverConnect, self.ircPort, self.onConnected.bind(self));
     }); // end socket.create
 };
 //initiates an object for command parser
@@ -50,21 +53,20 @@ IRCClient.prototype.onConnected= function()
   this.readForever();
   console.log("The socketId is "+socketId);
   //should this go in another function?
-  if(this.connected){
-    this.write('PASS none');
-    this.write('NICK ' + userName);
-    this.write('USER USER 0 * :Real Name', function(){
-     console.log("wrote pass, nick, and user user 0 *")
+
+  this.write('PASS none');
+  this.write('NICK ' + userName);
+  this.write('USER USER 0 * :Real Name', function(){
+   console.log("wrote pass, nick, and user user 0 *")
   })//end write
-  }//end if connected
 } // end onConnected
-IRCClient.prototype.onDisconnected=function()
+IRCClient.prototype.onDisconnected= function()
 {
   this.connected=false;
   document.getElementById('connectionStatus').textContent = "disconnected :(";
     chrome.socket.disconnect(socketId);
 } // end onDisconnected
-IRCClient.prototype.crackMessage=function(serverLine) {
+IRCClient.prototype.crackMessage= function(serverLine) {
 
   if(serverLine.length == 0)
   {
@@ -108,89 +110,86 @@ IRCClient.prototype.processReadInfo= function(readInfo)
   var serverMsg = self.ab2str(readInfo.data);
   console.log(dateRead + serverMsg);
   
-    //if trigger matches data, do stuff here.
+  //We may have more than one statement to process from the server in readInfo
+  //  so we will split up serverMsg by lines (\n) and put into an array called serverLines
 
-    var serverLines = [];
-    var serverMessages = [];
-    serverLines = serverMsg.split("\n");
+  var serverLines = [];
+  var serverMessages = [];
+  serverLines = serverMsg.split("\n");
 
-    //Split the server messages into single lines.
-    for(var i = 0; i < serverLines.length; i++)
+  //Process each server line with crackMessage()
+  for(var i = 0; i < serverLines.length; i++)
+  {
+    //If the line wasn't empty, save the message.
+    var msg = self.crackMessage(serverLines[i]);
+    if(msg !== undefined)
     {
-      //If the line wasn't empty, save the message.
-      var msg = self.crackMessage(serverLines[i]);
-      if(msg !== undefined)
-      {
-        serverMessages.push(msg);
-      }
+      serverMessages.push(msg);
     }
+  }
+  //Clean up the string for display to screen
+  var messageLines = serverMsg.trim().replace(/\r/g, '').split('\n');
+  for (var i = 0; i < messageLines.length; i++)
+  {
+    displayLineToScreen(messageLines[i]);
+  }
 
-    var messageLines = serverMsg.trim().replace(/\r/g, '').split('\n');
-    for (var i = 0; i < messageLines.length; i++)
-    {
-      displayLineToScreen(messageLines[i]);
-    }
+  //FIXME: Do we need to set server name here?
+  //get server name
+  //the server sends :servername. I start the substring at 1 instead of 0 to take this into account.
+  if(!self.serverName)
+  {
+    self.serverName = serverMsg.substring(1,serverMsg.search(' ')); //IRC server msg is of the for ":servername msg", so search for first instance of space as the end of the servername.
+  }
 
-    //get server name
-    //the server sends :servername. I start the substring at 1 instead of 0 to take this into account.
-    if(!self.serverName)
-    {
-      self.serverName = serverMsg.substring(1,serverMsg.search(' ')); //IRC server msg is of the for ":servername msg", so search for first instance of space as the end of the servername.
-    }
-
-    for(var i = 0; i < serverMessages.length; ++i) {
-      var m = serverMessages[i];
-      console.log(m.command, m);
-      switch(m.command) {
-        //Welcome message!
-        case "001":
-        console.log("Ready to join channel");
-          //make a join function
-          if(this.joinWhenConnected)
-            this.joinWhenConnected();
-          break;
-        case "PING":
-          //write a pong function
-          if(this.pingResp)
-            this.pingResp();
-          break;
-         case "PRIVMSG":
-          this.handlePrivmsg(m); 
-          console.log(m.msgSender);
-          break;
-         default:
-          //All this spew is a bit annoying.
-          //console.log("WARN: Unhandled message: ", m);
-          break;
-      }//end switch
+  for(var i = 0; i < serverMessages.length; ++i) {
+    var m = serverMessages[i];
+    console.log(m.command, m);
+    switch(m.command) {
+      //Welcome message!
+      case "001":
+      console.log("Ready to join channel");
+        //make a join function
+        if(this.onReady)
+          this.onReady();
+        break;
+      case "PING":
+        //write a pong function
+        if(this.pingResp)
+          this.pingResp();
+        break;
+       case "PRIVMSG":
+        this.handlePrivmsg(m); 
+        console.log(m.msgSender);
+        break;
+       default:
+        //All this spew is a bit annoying.
+        //console.log("WARN: Unhandled message: ", m);
+        break;
+    }//end switch
   }//end for
 }//end function processReadInfo
-//IRCCLient parses the message, then calls the user generated function onMessage if it exists. 
+//IRCCLient takes one message from the server and parses it
+//then calls the user generated function onMessage if it exists. 
 IRCClient.prototype.handlePrivmsg = function(message) {
   //This is a message to the channel:
 
-  for(var i = 0; i < message.args.length; ++i){
-    var arg = message.args[i];
-      //Slice off the colon from the first arg.
-      //FIXME: We should do this fixup elsewhere.
-    if(i === 0){
-        arg = arg.substring(1);
-      }
-    //find out who sent it:
-    var msgPrefix = message.prefix;
-    //console.log(message.prefix+"Prefix <---");        console.log(message.command);        console.log(message.args);
-    var msgSenderEnd=msgPrefix.search('!'); //IRC protocol is ":username!user@server CMD username msg". Hence, search for !~
-    //  console.log("msgSenderEnd: "+msgSenderEnd);
-    var msgSender = msgPrefix.substring(1,msgSenderEnd);
-    //  console.log(msgSender);
-    message.msgSender=msgSender;
-    //commence further parsing. hande over to user.
-    if (this.onMessage){
-     this.onMessage(message, arg);
-    }
-  }//end for  
+  var arg = message.args.join(" ");
+  //FIXME: we did not parse the : off the first part of this message. Do we need to?
+  //find out who sent it:
+  var msgPrefix = message.prefix;
+  //console.log(message.prefix+"Prefix <---");        console.log(message.command);        console.log(message.args);
+  var msgSenderEnd=msgPrefix.search('!'); //IRC protocol is ":username!user@server CMD username msg". Hence, search for !~
+  //  console.log("msgSenderEnd: "+msgSenderEnd);
+  var msgSender = msgPrefix.substring(1,msgSenderEnd);
+  //  console.log(msgSender);
+  message.msgSender=msgSender;
+  //commence further parsing. hande over to user.
+  if (this.onMessage){
+   this.onMessage(message, arg);
+  }
 }//end handlePrivMsg()
-IRCClient.prototype.readForever=function (readInfo){
+IRCClient.prototype.readForever= function (readInfo){
   var self = this;
   if(readInfo!==undefined && readInfo.resultCode <= 0){
     // we've been disconnected, dang.
@@ -249,7 +248,7 @@ IRCClient.prototype.setSilentTimeMin = function(min)
   this.silentTimeMin = min;
 }
 //PONG a server
-IRCClient.prototype.pong=function(){
+IRCClient.prototype.pong= function(){
   this.write("PONG :"+this.serverName);
   displayLineToScreen('[SERVER PONG]');
 }
@@ -274,7 +273,7 @@ function displayLineToScreen(text){
     container.childNodes[0].remove();
   }
 }
-IRCClient.prototype.getRandomGoodVibe =function(user){
+IRCClient.prototype.getRandomGoodVibe = function(user){
   var goodVibes = this.goodVibes;
   if(goodVibes.length>0)
   {

@@ -1,9 +1,8 @@
-//Goodbye Bot pseudocode
 
 function main(){
 //connect to server
 bot= new IRCClient();
-bot.setUserName("SaraGoodbyeBot");
+bot.setUserName("GoodbyeBot");
 bot.connectToServer(6667,"wright.freenode.net");
 bot.goodVibes = ["Goodbye.", "Goodbye, $user"];
 
@@ -39,11 +38,11 @@ else
 	}
 
 }
-bot.joinWhenConnected = function(){
+bot.onReady = function(){
 	//function called when join is ready.
 	if(bot.connected)
 		bot.join("#realtestchannel")
-}//end joinWhenConnected
+}//end onReady
 bot.pingResp = function(){
 	if(bot.connected)
 		this.pong();
