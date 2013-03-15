@@ -205,25 +205,16 @@ IRCClient.prototype.readForever= function (readInfo){
   chrome.socket.read(socketId, null, this.readForever.bind(this)); 
 }//end readForever
 
-//writes a message to the server. Argument is a string. The function automatically adds \r\n to the end of the message
-IRCClient.prototype.write= function(s, f) {
-  s+="\r\n";
-  console.log(s);
+//writes message to the server. Argument is a string. The function automatically adds \r\n to the end of the message
+IRCClient.prototype.write= function(str, func) {
+  str+="\r\n";
+  console.log(str);
 
   //Make sure we're not spamming the channel. If this is going to the channel, check to see how often we're sending. 
+  var dateObj = new Date();
 
-  if (s.search("PRIVMSG "+this.channelName)>-1)
-  {
-    //Spam Protection. We don't want to spam the channel. 
-    var dateObj = new Date();
-    if (dateObj.getTime()-this.timeOfLastChanMsg.getTime()>this.silentTimeMin*60000)
-    {
-      displayLineToScreen("[sent] " + s);
-      chrome.socket.write(socketId, this.str2ab(s), function(good) {console.log('write was ', good); if (f) f();});
-      this.timeOfLastChanMsg.setTime(dateObj.getTime());
-    }
-    else
-    {
+  //Spam Protection. We don't want to spam the channel. 
+  if (dateObj.getTime()-this.timeOfLastChanMsg.getTime()<this.silentTimeMin*60000 && str.search("PRIVMSG "+this.channelName)>-1) {
       displayLineToScreen("[Spam?] You don't get to write because you messaged the channel already. " + dateObj.getTime());
       console.log("You don't get to write because you messaged the channel already. dateObj.getTime: ")
       console.log(dateObj.getTime());
@@ -231,12 +222,14 @@ IRCClient.prototype.write= function(s, f) {
       console.log(this.timeOfLastChanMsg.getTime());
       console.log(dateObj.getTime()-this.timeOfLastChanMsg.getTime())
       console.log(dateObj.getTime()-this.timeOfLastChanMsg.getTime()<this.silentTimeMin*60000)
-    }
+      return;
   }
-  else
-  {
-    displayLineToScreen("[sent] " + s);
-    chrome.socket.write(socketId, this.str2ab(s), function(good) {console.log('write was ', good); if (f) f();});
+
+  displayLineToScreen("[sent] " + str);
+  chrome.socket.write(socketId, this.str2ab(str), function(good) {console.log('write was ', good); if (func) func();});
+  
+  if (str.search("PRIVMSG "+this.channelName)>-1){
+    this.timeOfLastChanMsg.setTime(dateObj.getTime());
   }
 }//end write
 
